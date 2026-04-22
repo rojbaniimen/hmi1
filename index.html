@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SIMATIC HMI – Station de Remplissage Pro</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@300;400;700&family=Share+Tech+Mono&display=swap');
+
+    :root {
+      --siemens-teal: #009999;
+      --siemens-blue: #0078D4;
+      --panel-bg: #d4d0c8;
+      --panel-light: #ece9d8;
+      --panel-dark: #808080;
+      --panel-border-light: #ffffff;
+      --panel-border-dark: #404040;
+      --header-bg: #c0c0c0;
+      --btn-face: #d4d0c8;
+      --alarm-red: #cc0000;
+      --ok-green: #00aa00;
+      --lcd-bg: #b8d4b0;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Roboto Condensed', sans-serif;
+      background: #787878;
+      display: flex;
+      justify-content: center;
+      padding: 16px;
+    }
+
+    .hmi-window {
+      width: 960px;
+      border: 2px solid var(--panel-border-dark);
+      border-top: 2px solid var(--panel-border-light);
+      border-left: 2px solid var(--panel-border-light);
+      background: var(--panel-bg);
+      box-shadow: 4px 4px 12px rgba(0,0,0,.5);
+      user-select: none;
+    }
+
+    .title-bar {
+      background: linear-gradient(to bottom,#0f4b8a,#1565c0);
+      color:#fff;
+      font-size:11px;
+      padding:3px 6px;
+      display:flex;
+      justify-content:space-between;
+    }
+
+    .brand-bar {
+      background:var(--header-bg);
+      border-bottom:2px solid var(--panel-border-dark);
+      display:flex;
+      align-items:center;
+      padding:4px 8px;
+      gap:8px;
+    }
+
+    .siemens-logo {
+      font-family:'Share Tech Mono', monospace;
+      font-size:11px;
+      font-weight:700;
+      color:var(--siemens-teal);
+    }
+
+    .page-title {
+      font-size:18px;
+      font-weight:700;
+      border-left:3px solid var(--siemens-teal);
+      padding-left:8px;
+    }
+
+    .clock { margin-left:auto; font-family:'Share Tech Mono'; font-size:11px; }
+
+    .content { padding: 10px; background: var(--panel-light); }
+
+    /* Cycle Strip Updated */
+    .cycle-strip {
+      display:flex;
+      background:#1a1a2e;
+      border:2px inset #333;
+      padding:6px;
+      margin-bottom:10px;
+      border-radius:2px;
+    }
+
+    .step-block {
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      flex:1;
+      transition:all .3s;
+      opacity:.3;
+      position:relative;
+    }
+
+    .step-block.active { opacity:1; }
+    .step-block.done { opacity:.7; }
+    .step-block::after { content:'→'; position:absolute; right:-5px; color:#555; top:10px; }
+    .step-block:last-child::after { display:none; }
+
+    .step-name { font-size:8px; font-weight:700; color:#ccc; margin-top:2px; }
+    .step-timer {
+      font-family:'Share Tech Mono';
+      font-size:11px;
+      background:#000;
+      color:#00ff88;
+      padding:1px 5px;
+      margin-top:2px;
+      min-width:35px;
+      text-align:center;
+    }
+
+    /* Layout */
+    .top-panel {
+      display:grid;
+      grid-template-columns: 240px 1fr 240px;
+      gap:10px;
+      margin-bottom:10px;
+    }
+
+    .panel-box {
+      border:2px inset #9a9a9a;
+      background:#dfddd2;
+      padding:8px;
+    }
+
+    .panel-title {
+      font-size:11px;
+      font-weight:700;
+      margin-bottom:8px;
+      border-bottom:1px solid #999;
+    }
+
+    .hmi-btn {
+      padding:4px 8px;
+      font-size:10px;
+      font-weight:700;
+      background:var(--btn-face);
+      border:2px solid;
+      border-color:var(--panel-border-light) var(--panel-border-dark) var(--panel-border-dark) var(--panel-border-light);
+    }
+
+    .hmi-btn:active:not(:disabled) {
+      border-color:var(--panel-border-dark) var(--panel-border-light) var(--panel-border-light) var(--panel-border-dark);
+    }
+
+    .lcd {
+      font-family:'Share Tech Mono';
+      background:var(--lcd-bg);
+      border:1px inset #888;
+      padding:2px 6px;
+      min-width:60px;
+      text-align:center;
+    }
+
+    /* Tanks */
+    .tank-wrap { display:flex; justify-content:space-around; align-items:flex-end; height:160px; }
+    .tank-col { display:flex; flex-direction:column; align-items:center; gap:4px; }
+    .tank {
+      width:50px;
+      height:90px;
+      border:2px solid #666;
+      background:#bbb;
+      position:relative;
+      overflow:hidden;
+      border-radius:2px 2px 5px 5px;
+    }
+    .liquid { position:absolute; bottom:0; left:0; right:0; transition:height 0.3s; }
+    .liq-pomme { background: #f07020; }
+    .liq-orange { background: #f0a030; }
+    .liq-eau { background: #add8e6; }
+    .liq-mix { background: #ccc; }
+
+    .pump-led { width:10px; height:10px; border-radius:50%; background:#333; border:1px solid #000; }
+    .pump-led.on { background:#00ff00; box-shadow: 0 0 5px #00ff00; }
+
+    .mixer { width:70px; height:100px; border:2px solid #444; position:relative; background:#eee; }
+    .agitator { position:absolute; top:5px; left:50%; width:2px; height:30px; background:#333; transform-origin: top center; }
+    .spinning { animation: rotate 0.5s linear infinite; }
+    @keyframes rotate { from { transform: translateX(-50%) rotateY(0deg); } to { transform: translateX(-50%) rotateY(360deg); } }
+
+    /* Bottles */
+    .bottle-grid { display:grid; grid-template-columns: repeat(10, 1fr); gap:5px; margin-top:5px; }
+    .bottle-body { width:100%; height:30px; border:1px solid #88aacc; background:rgba(255,255,255,0.5); position:relative; }
+    .bottle-fill { position:absolute; bottom:0; width:100%; background:#f0a050; transition: height 0.2s; }
+    .bottle-label { position:absolute; bottom:2px; width:100%; background:blue; color:white; font-size:6px; text-align:center; opacity:0; }
+
+    .led { width:12px; height:12px; border-radius:50%; background:#444; display:inline-block; vertical-align:middle; }
+    .led.green { background: #00ff00; }
+    .led.red { background: #ff0000; }
+    .led.yellow { background: #ffff00; }
+
+    .input-num {
+      width: 50px;
+      background: #000;
+      color: #00ff88;
+      border: 1px solid #777;
+      font-family: 'Share Tech Mono';
+      text-align: center;
+    }
+
+    .flow { width:4px; height:0; background:lightblue; margin: 0 auto; transition: height 0.2s; }
+    .flow.on { height:15px; }
+  </style>
+</head>
+<body>
+
+<div class="hmi-window">
+  <div class="title-bar">
+    <span>SIMATIC HMI - GESTION DE PRODUCTION</span>
+    <div><span>_ □ ×</span></div>
+  </div>
+
+  <div class="brand-bar">
+    <div class="siemens-logo">SIEMENS</div>
+    <div class="page-title">Station Automatisée</div>
+    <div class="clock" id="clock">--:--:--</div>
+  </div>
+
+  <div class="content">
+    <div class="cycle-strip">
+      <div class="step-block active" id="st-select"><span class="step-name">CHOIX</span><div class="step-timer">--</div></div>
+      <div class="step-block" id="st-dose"><span class="step-name">JUS</span><div class="step-timer" id="t-dose">10s</div></div>
+      <div class="step-block" id="st-eau"><span class="step-name">EAU</span><div class="step-timer" id="t-eau">10s</div></div>
+      <div class="step-block" id="st-mix"><span class="step-name">MIXAGE</span><div class="step-timer" id="t-mix">10s</div></div>
+      <div class="step-block" id="st-fill"><span class="step-name">REMPLISSAGE</span><div class="step-timer" id="t-fill">0/10</div></div>
+      <div class="step-block" id="st-done"><span class="step-name">FIN</span><div class="step-timer">--</div></div>
+    </div>
+
+    <div class="top-panel">
+      <div class="panel-box">
+        <div class="panel-title">Paramètres</div>
+        <div style="margin-bottom:10px">
+          <button class="hmi-btn" onclick="setProduct('pomme')" id="b-pomme">POMME</button>
+          <button class="hmi-btn" onclick="setProduct('orange')" id="b-orange">ORANGE</button>
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px">
+          <span style="font-size:10px">Nombre de lots :</span>
+          <input type="number" id="target-lots" class="input-num" value="1" min="1" max="99">
+        </div>
+        <div style="font-size:10px">
+          Lots produits : <span class="lcd" id="done-lots">0</span>
+        </div>
+      </div>
+
+      <div class="panel-box">
+        <div class="panel-title">Synoptique Réservoirs</div>
+        <div class="tank-wrap">
+          <div class="tank-col">
+            <div class="tank"><div class="liquid liq-pomme" id="l-pomme" style="height:80%"></div></div>
+            <div class="pump-led" id="p-pomme"></div>
+            <span style="font-size:8px">POMME</span>
+          </div>
+          <div class="tank-col">
+            <div class="tank"><div class="liquid liq-orange" id="l-orange" style="height:80%"></div></div>
+            <div class="pump-led" id="p-orange"></div>
+            <span style="font-size:8px">ORANGE</span>
+          </div>
+          <div class="tank-col">
+            <div class="tank"><div class="liquid liq-eau" id="l-eau" style="height:90%"></div></div>
+            <div class="pump-led" id="p-eau"></div>
+            <span style="font-size:8px">EAU</span>
+          </div>
+          <div class="tank-col">
+            <div class="mixer">
+              <div class="liquid liq-mix" id="l-mix" style="height:0%"></div>
+              <div class="agitator" id="agi"></div>
+            </div>
+            <span style="font-size:8px">MIXEUR</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel-box" style="text-align:center">
+        <div class="panel-title">Embouteillage</div>
+        <div style="height:40px; background:#ccc; width:20px; margin:0 auto; border-radius:2px"></div>
+        <div class="flow" id="flow"></div>
+        <div class="lcd" id="btl-now" style="margin-top:10px">BTL 0</div>
+      </div>
+    </div>
+
+    <div class="panel-box">
+      <div class="panel-title">Lot en cours</div>
+      <div class="bottle-grid" id="grid"></div>
+    </div>
+
+    <div style="margin-top:10px; display:flex; gap:10px; align-items:center">
+      <button class="hmi-btn" style="background:#00aa00; color:white" onclick="start()" id="btn-start">MARCHE</button>
+      <button class="hmi-btn" style="background:#aa0000; color:white" onclick="stop()" id="btn-stop" disabled>ARRÊT</button>
+      <button class="hmi-btn" onclick="reset()">RESET</button>
+      
+      <div style="margin-left:20px; font-size:10px">
+        <div class="led" id="led-run"></div> RUN
+        <div class="led red" id="led-idle" style="background:red"></div> IDLE
+      </div>
+    </div>
+  </div>
+
+  <div style="background:#ffffcc; padding:4px; font-size:10px; border-top:1px solid #ccc" id="msg">
+    Système prêt. Sélectionnez un jus et le nombre de lots.
+  </div>
+</div>
+
+<script>
+  let product = 'pomme';
+  let state = 'idle'; 
+  let timer = 0;
+  let currentLot = 0;
+  let currentBtl = 0;
+  let fillLevel = 0;
+  let mainLoop = null;
+
+  const $ = id => document.getElementById(id);
+
+  function initGrid() {
+    $('grid').innerHTML = '';
+    for(let i=0; i<10; i++) {
+      $('grid').innerHTML += `<div class="bottle-col"><div class="bottle-body"><div class="bottle-fill" id="f-${i}"></div><div class="bottle-label" id="lbl-${i}">L00</div></div></div>`;
+    }
+  }
+
+  function setProduct(p) {
+    if(state !== 'idle') return;
+    product = p;
+    $('b-pomme').style.outline = p === 'pomme' ? '2px solid blue' : 'none';
+    $('b-orange').style.outline = p === 'orange' ? '2px solid blue' : 'none';
+  }
+
+  function updateStep(step) {
+    document.querySelectorAll('.step-block').forEach(b => b.classList.remove('active', 'done'));
+    $(step).classList.add('active');
+  }
+
+  function start() {
+    if(state !== 'idle') return;
+    state = 'dose_jus';
+    timer = 10;
+    currentBtl = 0;
+    $('btn-start').disabled = true;
+    $('btn-stop').disabled = false;
+    $('led-run').classList.add('green');
+    $('led-idle').style.background = '#444';
+    mainLoop = setInterval(tick, 1000);
+  }
+
+  function stop() {
+    clearInterval(mainLoop);
+    state = 'idle';
+    $('btn-start').disabled = false;
+    $('btn-stop').disabled = true;
+    $('led-run').classList.remove('green');
+    $('led-idle').style.background = 'red';
+    allOff();
+  }
+
+  function allOff() {
+    $('p-pomme').classList.remove('on');
+    $('p-orange').classList.remove('on');
+    $('p-eau').classList.remove('on');
+    $('agi').classList.remove('spinning');
+    $('flow').classList.remove('on');
+  }
+
+  function tick() {
+    if(state === 'dose_jus') {
+      updateStep('st-dose');
+      $('p-' + product).classList.add('on');
+      timer--;
+      $('t-dose').textContent = timer + 's';
+      $('l-' + product).style.height = (parseInt($('l-' + product).style.height) - 2) + '%';
+      $('l-mix').style.height = (parseInt($('l-mix').style.height) + 5) + '%';
+      
+      if(timer <= 0) {
+        allOff();
+        state = 'dose_eau';
+        timer = 10;
+        $('t-dose').textContent = 'OK';
+      }
+    } 
+    else if(state === 'dose_eau') {
+      updateStep('st-eau');
+      $('p-eau').classList.add('on');
+      timer--;
+      $('t-eau').textContent = timer + 's';
+      $('l-eau').style.height = (parseInt($('l-eau').style.height) - 2) + '%';
+      $('l-mix').style.height = (parseInt($('l-mix').style.height) + 5) + '%';
+
+      if(timer <= 0) {
+        allOff();
+        state = 'mixage';
+        timer = 10;
+        $('t-eau').textContent = 'OK';
+      }
+    }
+    else if(state === 'mixage') {
+      updateStep('st-mix');
+      $('agi').classList.add('spinning');
+      timer--;
+      $('t-mix').textContent = timer + 's';
+      if(timer <= 0) {
+        allOff();
+        state = 'remplissage';
+        $('t-mix').textContent = 'OK';
+      }
+    }
+    else if(state === 'remplissage') {
+      updateStep('st-fill');
+      $('flow').classList.add('on');
+      fillLevel += 25;
+      $(`f-${currentBtl}`).style.height = fillLevel + '%';
+      $('t-fill').textContent = `${currentBtl}/10`;
+
+      if(fillLevel >= 100) {
+        $(`lbl-${currentBtl}`).style.opacity = 1;
+        $(`lbl-${currentBtl}`).textContent = 'L' + String(currentLot + 1).padStart(2, '0');
+        currentBtl++;
+        fillLevel = 0;
+        $('l-mix').style.height = (parseInt($('l-mix').style.height) - 10) + '%';
+      }
+
+      if(currentBtl >= 10) {
+        allOff();
+        state = 'lot_fini';
+      }
+    }
+    else if(state === 'lot_fini') {
+      currentLot++;
+      $('done-lots').textContent = currentLot;
+      let target = parseInt($('target-lots').value);
+      
+      if(currentLot < target) {
+        state = 'dose_jus';
+        timer = 10;
+        currentBtl = 0;
+        initGrid();
+        $('t-dose').textContent = '10s';
+        $('t-eau').textContent = '10s';
+        $('t-mix').textContent = '10s';
+      } else {
+        stop();
+        $('msg').textContent = "Production terminée !";
+        updateStep('st-done');
+      }
+    }
+  }
+
+  function reset() {
+    location.reload();
+  }
+
+  // Init clock
+  setInterval(() => {
+    $('clock').textContent = new Date().toLocaleTimeString();
+  }, 1000);
+
+  initGrid();
+  setProduct('pomme');
+</script>
+
+</body>
+</html>
